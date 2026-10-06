@@ -43,7 +43,7 @@ public class UsersController : Controller
             return CreatedAtRoute(
                 nameof(GetUserById),
                 new { userId = createdUserEntity.Id },
-                _mapper.Map<UserDto>(createdUserEntity));
+                createdUserEntity.Id);
         }
 
         return UnprocessableEntity(ModelState);
