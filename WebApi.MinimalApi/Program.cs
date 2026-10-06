@@ -32,7 +32,13 @@ builder.Services.AddControllers(options =>
         // Здесь она нужна, чтобы в этом случае ответ возвращался в формате JSON
         options.RespectBrowserAcceptHeader = true;
     })
-    .ConfigureApiBehaviorOptions(_ => { });
+    .ConfigureApiBehaviorOptions(_ => { })
+    .AddNewtonsoftJson(options =>
+    {
+        options.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+        options.SerializerSettings.DefaultValueHandling = DefaultValueHandling.Populate;
+    });
+
 
 builder.Services.AddAutoMapper(cfg =>
 {
@@ -40,6 +46,8 @@ builder.Services.AddAutoMapper(cfg =>
         .ForMember(dest => dest.FullName,
             opt => opt.MapFrom(src => $"{src.LastName} {src.FirstName}"));
 }, new System.Reflection.Assembly[0]);
+
+builder.Services.AddAutoMapper(cfg => { cfg.CreateMap<CreateUserDto, UserEntity>(); }, new System.Reflection.Assembly[0]);
 
 var app = builder.Build();
 
