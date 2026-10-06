@@ -24,26 +24,18 @@ public class UsersController : Controller
     public ActionResult<UserDto> GetUserById([FromRoute] Guid userId)
     {
         var user = _userRepository.FindById(userId);
-        // return user == null
-        //     ? NotFound()
-        //     : Ok(new UserDto
-        //     {
-        //         FullName = $"{user.LastName} {user.FirstName}", Id = user.Id, CurrentGameId = user.CurrentGameId, GamesPlayed = user.GamesPlayed,
-        //         Login = user.Login
-        //     });
         return user == null ? NotFound() : Ok(_mapper.Map<UserDto>(user));
     }
 
     [HttpPost]
+    [Produces("application/json", "application/xml")]
     public IActionResult CreateUser([FromBody] CreateUserDto user)
     {
         if (user == null)
-        {
             return BadRequest();
-        }
 
         if (user.Login != null && !user.Login.All(char.IsLetterOrDigit))
-            ModelState.AddModelError(nameof(user.Login), "Логин должен состоять из цифр или букв!");
+            ModelState.AddModelError(nameof(user.Login), "Login should contain only letters or digits");
 
         if (ModelState.IsValid)
         {
@@ -55,5 +47,30 @@ public class UsersController : Controller
         }
 
         return UnprocessableEntity(ModelState);
+    }
+
+    
+    [HttpPut("{userId}")]
+    [Produces("application/json", "application/xml")]
+
+    public IActionResult UpdateUser([FromRoute] Guid userId, [FromBody] UpdateUserDto? userDto)
+    {
+        if (userDto == null || userId == Guid.Empty)
+            return BadRequest();
+        
+        if (!ModelState.IsValid)
+        {
+            return UnprocessableEntity(ModelState);
+        }
+        
+        var user = _mapper.Map(userDto, new UserEntity(userId));
+        _userRepository.UpdateOrInsert(user, out var isInserted);
+        
+        if (isInserted)
+            return CreatedAtRoute(
+                nameof(GetUserById),
+                new { userId = user.Id },
+                user.Id);
+        return NoContent();
     }
 }
