@@ -63,7 +63,6 @@ public class UsersController : Controller
     
     [HttpPut("{userId}")]
     [Produces("application/json", "application/xml")]
-
     public IActionResult UpdateUser([FromRoute] Guid userId, [FromBody] UpdateUserDto? userDto)
     {
         if (userDto == null || userId == Guid.Empty)
@@ -84,12 +83,31 @@ public class UsersController : Controller
                 user.Id);
         return NoContent();
     }
-    
-    /// <summary>
-    /// Удалить запись о пользователе.
-    /// </summary>
-    /// <param name="userId">Id пользователя</param>
-    /// <returns></returns>
+
+    [HttpPatch("{userId}")]
+    [Produces("application/json", "application/xml")]
+    public IActionResult PartiallyUpdateUser([FromRoute] Guid userId, [FromBody] JsonPatchDocument<UpdateUserDto>? patchDoc)
+    {
+        if (patchDoc is null)
+            return BadRequest();
+        
+        var user = _userRepository.FindById(userId);
+        if (user is null)
+            return NotFound();
+        
+        var updateUserDto = _mapper.Map<UpdateUserDto>(user);
+        patchDoc.ApplyTo(updateUserDto, ModelState);
+        
+        TryValidateModel(updateUserDto);
+        if (!ModelState.IsValid)
+            return UnprocessableEntity(ModelState);
+        
+        _mapper.Map(updateUserDto, user);
+        _userRepository.Update(user);
+        
+        return NoContent();
+    }
+
     [HttpDelete("{userId}")]
     public IActionResult DeleteUser([FromRoute] Guid userId)
     {
@@ -101,11 +119,6 @@ public class UsersController : Controller
         return NoContent();
     }
 
-    /// <summary>
-    /// Проверить наличие пользователя.
-    /// </summary>
-    /// <param name="userId">Id пользователя</param>
-    /// <returns></returns>
     [HttpHead("{userId}")]
     public IActionResult HeadUserById([FromRoute] Guid userId)
     {
@@ -117,12 +130,6 @@ public class UsersController : Controller
         return Ok();
     }
     
-    /// <summary>
-    /// Получить список пользователей с пагинацией.
-    /// </summary>
-    /// <param name="pageNumber">Номер возвращаемой страницы</param>
-    /// <param name="pageSize">Размер возвращаемой страницы</param>
-    /// <returns></returns>
     [HttpGet(Name = nameof(GetUsers))]
     public IActionResult GetUsers(
         [FromQuery] int pageNumber = DefaultPageNumber,
@@ -161,99 +168,6 @@ public class UsersController : Controller
         return Ok(users);
     }
 
-    /// <summary>
-    /// Получить список методов, доступных в контексте коллекции пользователей.
-    /// </summary>
-    [HttpOptions]
-    public IActionResult GetUserOptions()
-    {
-        Response.Headers.AppendCommaSeparatedValues(
-            HeaderNames.Allow,
-            HttpMethods.Get, HttpMethods.Post, HttpMethods.Options
-        );
-
-        return Ok();
-    }
-    
-    /// <summary>
-    /// Удалить запись о пользователе.
-    /// </summary>
-    /// <param name="userId">Id пользователя</param>
-    /// <returns></returns>
-    [HttpDelete("{userId}")]
-    public IActionResult DeleteUser([FromRoute] Guid userId)
-    {
-        var user = _userRepository.FindById(userId);
-        if (user is null)
-            return NotFound();
-        
-        _userRepository.Delete(userId);
-        return NoContent();
-    }
-
-    /// <summary>
-    /// Проверить наличие пользователя.
-    /// </summary>
-    /// <param name="userId">Id пользователя</param>
-    /// <returns></returns>
-    [HttpHead("{userId}")]
-    public IActionResult HeadUserById([FromRoute] Guid userId)
-    {
-        var user = _userRepository.FindById(userId);
-        if (user is null)
-            return NotFound();
-
-        Response.ContentType = "application/json; charset=utf-8";
-        return Ok();
-    }
-    
-    /// <summary>
-    /// Получить список пользователей с пагинацией.
-    /// </summary>
-    /// <param name="pageNumber">Номер возвращаемой страницы</param>
-    /// <param name="pageSize">Размер возвращаемой страницы</param>
-    /// <returns></returns>
-    [HttpGet(Name = nameof(GetUsers))]
-    public IActionResult GetUsers(
-        [FromQuery] int pageNumber = DefaultPageNumber,
-        [FromQuery] int pageSize = DefaultPageSize)
-    {
-        pageNumber = Math.Max(pageNumber, MinPageNumber);
-        pageSize = Math.Clamp(pageSize, MinPageSize, MaxPageSize);
-
-        var pageList = _userRepository.GetPage(pageNumber, pageSize);
-
-        var previousPageLink = pageList.HasPrevious
-            ? _linkGenerator.GetUriByRouteValues(
-                HttpContext,
-                nameof(GetUsers),
-                new { pageNumber = pageNumber - 1, pageSize })
-            : null;
-        var nextPageLink = pageList.HasNext
-            ? _linkGenerator.GetUriByRouteValues(
-                HttpContext,
-                nameof(GetUsers),
-                new { pageNumber = pageNumber + 1, pageSize })
-            : null;
-
-        var paginationHeader = new
-        {
-            previousPageLink,
-            nextPageLink,
-            totalCount = pageList.TotalCount,
-            pageSize = pageList.PageSize,
-            currentPage = pageList.CurrentPage,
-            totalPages = pageList.TotalPages
-        };
-        Response.Headers.Append("X-Pagination", JsonConvert.SerializeObject(paginationHeader));
-
-        var users = _mapper.Map<IEnumerable<UserDto>>(pageList);
-        return Ok(users);
-    }
-
-    /// <summary>
-    /// Получить список методов, доступных в контексте коллекции пользователей.
-    /// </summary>
     [HttpOptions]
     public IActionResult GetUserOptions()
     {
